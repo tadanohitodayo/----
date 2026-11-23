@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>B♭を当てるやつ！</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#e3f0e4;--bg2:#d4dff0;--fg:#22352c;--card:#f4faf5;--ac:#4f8f72;--on:#fff;--mut:#5f7a6b;--ok:#2e7d4f;--ng:#b4541a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c2c2a;--bg2:#2b2d4a;--fg:#e4f2ea;--card:#25383a;--ac:#8fcfb0;--on:#10231b;--mut:#9bb8a8;--ok:#86efac;--ng:#fdba74}}
+:root[data-theme="dark"]{--bg:#1c2c2a;--bg2:#2b2d4a;--fg:#e4f2ea;--card:#25383a;--ac:#8fcfb0;--on:#10231b;--mut:#9bb8a8;--ok:#86efac;--ng:#fdba74}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;min-height:100vh;display:flex;justify-content:center}
+main{width:100%;max-width:440px;padding:24px 20px;text-align:center}
+h1{font-size:1.5rem;margin:8px 0 4px}
+.sub{color:var(--mut);font-size:.85rem;margin:0 0 20px}
+.seg{display:flex;background:var(--card);border-radius:12px;padding:4px;margin-bottom:20px}
+.seg button{flex:1;border:0;background:none;color:var(--fg);font-size:1rem;padding:10px;border-radius:9px;cursor:pointer}
+.seg button.on{background:var(--ac);color:var(--on)}
+.card{background:var(--card);border-radius:16px;padding:24px 16px}
+.big{font-size:1.1rem;margin:0 0 16px}
+input[type=range]{width:100%;accent-color:var(--ac);margin:12px 0 24px}
+.row{display:flex;gap:12px}
+.row button,.next{flex:1;border:0;border-radius:12px;padding:14px;font-size:1.05rem;cursor:pointer;background:var(--ac);color:var(--on)}
+.row button.sec{background:transparent;color:var(--ac);border:2px solid var(--ac)}
+.next{width:100%;margin-top:16px}
+.res{margin-top:20px;font-size:1rem;line-height:1.8}
+.res b{font-size:1.6rem;display:block}
+.hint{color:var(--mut);font-size:.8rem;margin-top:18px}
+.fine{display:flex;gap:12px;margin:-12px 0 20px}
+.fine button{flex:1;border:1px solid var(--ac);background:transparent;color:var(--ac);border-radius:10px;padding:8px;font-size:.9rem;cursor:pointer}
+.fine button:disabled{opacity:.4}
+footer{color:var(--mut);font-size:.8rem;margin-top:28px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>B♭を当てるやつ！</h1>
+<p class="sub">スライダーで音を動かして、B♭に合わせよう</p>
+<div class="seg" id="seg">
+<button data-ref="440" class="on">A=440Hz</button>
+<button data-ref="442">A=442Hz</button>
+</div>
+<div class="card">
+<p class="big" id="goal">B♭（A=440Hz基準）を当てて！</p>
+<input type="range" id="sl" min="0" max="100" step="0.5" value="50" aria-label="音の高さ">
+<div class="fine"><button id="dn">−1セント</button><button id="up">+1セント</button></div>
+<div class="row">
+<button id="play">再生</button>
+<button id="ok" class="sec">決定！</button>
+</div>
+<div class="res" id="res" hidden></div>
+<button class="next" id="next" hidden>次の問題</button>
+</div>
+<p class="hint">※消音モードをオフにしてください。ヘッドホン推奨。</p>
+<footer>© 2026 Ryo Watanabe</footer>
+</main>
+<script>
+(function(){
+var ref=440,offset=0,ctx=null,osc=null,gain=null,playing=false,done=false;
+var sl=document.getElementById('sl'),playB=document.getElementById('play'),okB=document.getElementById('ok'),
+dn=document.getElementById('dn'),up=document.getElementById('up'),res=document.getElementById('res'),nextB=document.getElementById('next'),goal=document.getElementById('goal');
+function target(){return ref*Math.pow(2,1/12)}
+function cents(){return Math.round((parseFloat(sl.value)-50)*2+offset)}
+function freq(){return target()*Math.pow(2,cents()/1200)}
+function newRound(){
+stop();done=false;
+var s=Math.random()<.5?-1:1;
+offset=s*Math.round(15+Math.random()*40);
+sl.value=50;sl.disabled=false;dn.disabled=up.disabled=false;
+res.hidden=true;nextB.hidden=true;okB.disabled=false;
+goal.textContent='B♭（A='+ref+'Hz基準）を当てて！';
+}
+function start(){
+if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)()}
+if(ctx.state==='suspended')ctx.resume();
+osc=ctx.createOscillator();gain=ctx.createGain();
+osc.type='sine';osc.frequency.value=freq();
+gain.gain.setValueAtTime(0,ctx.currentTime);
+gain.gain.linearRampToValueAtTime(.25,ctx.currentTime+.05);
+osc.connect(gain);gain.connect(ctx.destination);osc.start();
+playing=true;playB.textContent='停止';
+}
+function stop(){
+if(osc){var o=osc,g=gain;try{g.gain.cancelScheduledValues(ctx.currentTime);g.gain.setValueAtTime(g.gain.value,ctx.currentTime);g.gain.linearRampToValueAtTime(0,ctx.currentTime+.05);o.stop(ctx.currentTime+.06)}catch(e){}}
+osc=null;playing=false;playB.textContent='再生';
+}
+playB.onclick=function(){playing?stop():start()};
+sl.oninput=function(){if(osc)osc.frequency.setTargetAtTime(freq(),ctx.currentTime,.02)};
+okB.onclick=function(){
+if(done)return;done=true;
+var c=cents(),f=freq(),t=target();
+var cls=c===0?'var(--ok)':'var(--ng)';
+var msg=c===0?'ぴったり！':'ぴったりじゃない…';
+res.innerHTML='<b style="color:'+cls+'">'+msg+'</b>'+
+'あなたの答え：'+f.toFixed(2)+' Hz<br>正解（B♭）：'+t.toFixed(2)+' Hz<br>'+
+'ずれ：'+(c>=0?'+':'')+c+' セント（'+(c>0?'高い':c<0?'低い':'ぴったり')+'）';
+res.hidden=false;nextB.hidden=false;okB.disabled=true;sl.disabled=true;dn.disabled=up.disabled=true;
+if(osc)osc.frequency.setTargetAtTime(t,ctx.currentTime,.02);
+};
+nextB.onclick=function(){newRound();};
+dn.onclick=function(){sl.value=parseFloat(sl.value)-.5;sl.oninput()};
+up.onclick=function(){sl.value=parseFloat(sl.value)+.5;sl.oninput()};
+var btns=document.querySelectorAll('#seg button');
+btns.forEach(function(b){b.onclick=function(){
+btns.forEach(function(x){x.classList.remove('on')});b.classList.add('on');
+ref=parseInt(b.dataset.ref,10);newRound();
+}});
+newRound();
+})();
+</script>
+</body>
+</html>
